@@ -12,7 +12,7 @@ for pathindex in $(eval echo "{1..$1}"); do
   [[ $MaxHopsThisPath -gt $MaxHopsWithinAllPaths ]] && MaxHopsWithinAllPaths=$MaxHopsThisPath
 done
 
-for hopindex in $(eval echo "{1..$MaxHopsWithinAllLoops}"); do
+for hopindex in $(eval echo "{1..$MaxHopsWithinAllPaths}"); do
   for pathindex in $(eval echo "{1..$1}"); do
     This_Hops_IP=echo "${array[$pathindex]}" | awk -v hopindex="$hopindex" '$1==hopindex { print $0 }' | awk -F  "[()]" '{print $2}'
     echo $hopindex - $This_Hops_IP
