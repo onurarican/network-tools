@@ -3,6 +3,18 @@
 # Usage:
 # ./zPrintPath.sh <count> <timeout> <IP> <tcp_port>
 
-for probeindex in $(eval echo "{1..$1}"); do array[$probeindex]=`sudo traceroute -Tq 1 $3 -p $4 -w $2`; done
+MaxHopsWithinAllPaths=0
+
+for pathindex in $(eval echo "{1..$1}"); do
+  array[$pathindex]=`sudo traceroute -Tq 1 $3 -p $4 -w $2`
+  MaxHopsThisPath=`echo "${array[$pathindex]}" | awk '{print $1}' | tail -1`
+  [[ $MaxHopsThisPath -gt $MaxHopsWithinAllPaths ]] && MaxHopsWithinAllPaths=$MaxHopsThisPath
+done
+
+for hopindex in $(eval echo "{1..$MaxHopsWithinAllLoops}"); do
+  for pathindex in $(eval echo "{1..$1}"); do
+    Hops_IP=echo "${array[$pathindex]}" | awk -v hopindex="$hopindex" '$1==hopindex { print $0 }' | awk -F  "[()]" '{print $2}'
+  done
+done
 
 exit 0
