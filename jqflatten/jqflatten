@@ -1,0 +1,14 @@
+#!/bin/bash
+
+# Pre-requisites:
+# jq
+
+[ $# -ge 1 -a -f "$1" ] && input="$1" || input="-"
+
+if [[ $1 == "-p" ]]; then
+  cat $input | sed "s/'/\"/g" | sed "s/: u/: /g" | sed "s/\\\//g" | sed "s/ False,/ \"False\",/g" | sed "s/ True,/ \"True\",/g" | jq --arg delim '.' 'reduce (tostream|select(length==2)) as $i ({}; .[[$i[0][]|tostring]|join($delim)] = $i[1])' | grep -v "^{$" | grep -v "^}$" | sed "s/^ *//g" | sed "s/\"//g" | sed "s/,$//g" | sed "s/: / /g"
+else
+  cat $input | sed "s/'/\"/g" | sed "s/: u/: /g" | sed "s/\\\//g" | sed "s/ False,/ \"False\",/g" | sed "s/ True,/ \"True\",/g" | jq --arg delim '.' 'reduce (tostream|select(length==2)) as $i ({}; .[[$i[0][]|tostring]|join($delim)] = $i[1])'
+fi
+
+exit 0
