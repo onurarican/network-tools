@@ -7,7 +7,7 @@ client = ims.connect_to_api(neteng_user=True)
 
 if len(sys.argv) !=5 and len(sys.argv) !=6:
    print 'imsquery Hardware getAllObjects \'{"id": {"operation": 1742603}}\' 100 "mask[id, hostname, domain, accountId, datacenter, networkVlans, networkManagementIpAddress, primaryBackendIpAddress, primaryIpAddress, softwareComponents[modifyDate, passwords[username, password], softwareLicense[softwareDescriptionId, softwareDescription[longDescription]]], uplinkNetworkComponents[id, name, port, primaryIpAddress, networkVlanId, macAddress, speed, status, uplink[id, uplinkComponent[id, hardwareId, name, port, duplexModeId, maxSpeed, speed, status, networkPortChannelId, networkVlanId]]], upstreamHardware[id, hostname]]" | jqflatten'
-   print 'imsquery Virtual_Guest getAllObjects \'{"id": {"operation": 62765165}}\' 100 "mask[id, hostname, domain, accountId, datacenter, networkVlans, primaryBackendIpAddress, primaryIpAddress, softwareComponents[modifyDate, passwords[username, password], softwareLicense[softwareDescriptionId, softwareDescription[longDescription]]]]" | jqflatten'
+   print ('imsquery Virtual_Guest getAllObjects \'{"id": {"operation": 62765165}}\' 100 "mask[id, hostname, domain, accountId, datacenter, networkVlans, primaryBackendIpAddress, primaryIpAddress, softwareComponents[modifyDate, passwords[username, password], softwareLicense[softwareDescriptionId, softwareDescription[longDescription]]]]" | jqflatten')
    sys.exit()
 
 DBType = sys.argv[1]

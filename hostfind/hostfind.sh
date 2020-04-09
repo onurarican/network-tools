@@ -3,6 +3,7 @@
 
 # Pre-requisites:
 # imsquery
+# jq
 # jqflatten
 # bc
 # interfacecounters
@@ -10,7 +11,7 @@
 fInitParams() {
   MyName=`basename "$0"`
   ToolDir=/home/oarican/tools/hostfind
-  LogDir=$ToolDir/logs; [[ ! -d $LogDir ]] && mkdir -p $LogDir
+  LogDir=$ToolDir/logs; [[ -d $ToolDir && ! -d $LogDir ]] && mkdir -p $LogDir
   LogFile=$LogDir/hostfind.log
   # Colour Codes
   #ClNormal="\e[39m" # Was 0 before
@@ -51,8 +52,8 @@ fPrintHostInfo() {
   printf "%-16s %s\n" "OS Description: " "`fGetObject 0.softwareComponents.0.softwareLicense.softwareDescription.longDescription DeviceProperties`"
   printf "%-16s %s\n" "OS Username: " "`fGetObject 0.softwareComponents.0.passwords.0.username DeviceProperties`"
   printf "%-16s %s\n" "OS Password: " "`fGetObject 0.softwareComponents.0.passwords.0.password DeviceProperties`"
-  printf "%-16s %s\n" "Management IP: " "`fGetObject 0.networkManagementIpAddress DeviceProperties`"
-  [[ $bCheckL2Path -eq 1 ]] && $L2PathCheckTool $DeviceHWID --no-host-info `[[ ! -z $bSamplingPeriod ]] && echo " -t $bSamplingPeriod"` `[[ ! -z $bWriteOutputToFile ]] && echo " --report" || echo " --no-report"`
+  printf "%-16s %s / %s    "$ClGray"(%s)"$ClNormal"\n" "Device IPs: " "`fGetObject 0.primaryBackendIpAddress DeviceProperties`" "`fGetObject 0.primaryIpAddress DeviceProperties`" "`fGetObject 0.networkManagementIpAddress DeviceProperties`"
+  [[ $bCheckL2Path -eq 1 ]] && $L2PathCheckTool $DeviceHWID --no-host-info `[[ ! -z $UsersName && ! -z $UsersPass ]] && echo " -u $UsersName -p $UsersPass"` `[[ ! -z $bSamplingPeriod ]] && echo " -t $bSamplingPeriod"` `[[ ! -z $bWriteOutputToFile ]] && echo " --report" || echo " --no-report"`
 }
 fPrintAccountInfo() {
   echo -e "\n\e[93mACCOUNT INFORMATION\e[1;0m"
@@ -61,28 +62,28 @@ fPrintAccountInfo() {
   printf "%-12s %s\n" "Country: " "`fGetObject 0.country AccountProperties`"
 }
 fInputIsHWID() {
-  DeviceProperties=`sh -c "imsquery Hardware getAllObjects '{\"id\": {\"operation\": "$DeviceHWID"}}' $ImsQryLimit \"mask[id, hostname, domain, accountId, datacenter, networkVlans, networkManagementIpAddress, primaryBackendIpAddress, primaryIpAddress, softwareComponents[modifyDate, passwords[username, password], softwareLicense[softwareDescriptionId, softwareDescription[longDescription]]], uplinkNetworkComponents[id, name, port, primaryIpAddress, networkVlanId, macAddress, speed, status, uplink[id, uplinkComponent[id, hardwareId, name, port, duplexModeId, maxSpeed, speed, status, networkPortChannelId, networkVlanId]]], upstreamHardware[id, hostname]]\" | jqflatten -p"`
+  DeviceProperties=`sh -c "imsquery Hardware getAllObjects '{\"id\": {\"operation\": "$DeviceHWID"}}' $ImsQryLimit \"mask[id, hostname, domain, accountId, datacenter, networkVlans, networkManagementIpAddress, primaryBackendIpAddress, primaryIpAddress, softwareComponents[modifyDate, passwords[username, password], softwareLicense[softwareDescriptionId, softwareDescription[longDescription]]], uplinkNetworkComponents[id, name, port, primaryIpAddress, networkVlanId, macAddress, speed, status, uplink[id, uplinkComponent[id, hardwareId, name, port, duplexModeId, maxSpeed, speed, status, networkPortChannelId, networkVlanId]]], upstreamHardware[id, hostname]]\" 2> /dev/null | jqflatten -p"`
   [[ `echo "$DeviceProperties" | grep "^1" >/dev/null; echo $?` -eq 0 ]] && { echo More than 1 device found. Exiting.; exit 1; }
   fPrintHostInfo
 }
 fInputIsIP() {
-  DeviceProperties=`sh -c "imsquery Hardware getAllObjects '{\"primaryBackendIpAddress\": {\"operation\": \"$DeviceIP\"}}' $ImsQryLimit \"mask[id, hostname, domain, accountId, datacenter, networkVlans, networkManagementIpAddress, primaryBackendIpAddress, primaryIpAddress, softwareComponents[modifyDate, passwords[username, password], softwareLicense[softwareDescriptionId, softwareDescription[longDescription]]], uplinkNetworkComponents[id, name, port, primaryIpAddress, networkVlanId, macAddress, speed, status, uplink[id, uplinkComponent[id, hardwareId, name, port, duplexModeId, maxSpeed, speed, status, networkPortChannelId, networkVlanId]]], upstreamHardware[id, hostname]]\" | jqflatten -p"`
+  DeviceProperties=`sh -c "imsquery Hardware getAllObjects '{\"primaryBackendIpAddress\": {\"operation\": \"$DeviceIP\"}}' $ImsQryLimit \"mask[id, hostname, domain, accountId, datacenter, networkVlans, networkManagementIpAddress, primaryBackendIpAddress, primaryIpAddress, softwareComponents[modifyDate, passwords[username, password], softwareLicense[softwareDescriptionId, softwareDescription[longDescription]]], uplinkNetworkComponents[id, name, port, primaryIpAddress, networkVlanId, macAddress, speed, status, uplink[id, uplinkComponent[id, hardwareId, name, port, duplexModeId, maxSpeed, speed, status, networkPortChannelId, networkVlanId]]], upstreamHardware[id, hostname]]\" 2> /dev/null | jqflatten -p"`
   [[ `echo "$DeviceProperties" | grep "^1" >/dev/null; echo $?` -eq 0 ]] && { echo More than 1 device found. Exiting.; exit 1; }
   [[ `echo "$DeviceProperties" | grep "^0" >/dev/null; echo $?` -eq 0 ]] && { fPrintHostInfo; exit 0; }
-  DeviceProperties=`sh -c "imsquery Hardware getAllObjects '{\"primaryIpAddress\": {\"operation\": \"$DeviceIP\"}}' $ImsQryLimit \"mask[id, hostname, domain, accountId, datacenter, networkVlans, networkManagementIpAddress, primaryBackendIpAddress, primaryIpAddress, softwareComponents[modifyDate, passwords[username, password], softwareLicense[softwareDescriptionId, softwareDescription[longDescription]]], uplinkNetworkComponents[id, name, port, primaryIpAddress, networkVlanId, macAddress, speed, status, uplink[id, uplinkComponent[id, hardwareId, name, port, duplexModeId, maxSpeed, speed, status, networkPortChannelId, networkVlanId]]], upstreamHardware[id, hostname]]\" | jqflatten -p"`
+  DeviceProperties=`sh -c "imsquery Hardware getAllObjects '{\"primaryIpAddress\": {\"operation\": \"$DeviceIP\"}}' $ImsQryLimit \"mask[id, hostname, domain, accountId, datacenter, networkVlans, networkManagementIpAddress, primaryBackendIpAddress, primaryIpAddress, softwareComponents[modifyDate, passwords[username, password], softwareLicense[softwareDescriptionId, softwareDescription[longDescription]]], uplinkNetworkComponents[id, name, port, primaryIpAddress, networkVlanId, macAddress, speed, status, uplink[id, uplinkComponent[id, hardwareId, name, port, duplexModeId, maxSpeed, speed, status, networkPortChannelId, networkVlanId]]], upstreamHardware[id, hostname]]\" 2> /dev/null | jqflatten -p"`
   [[ `echo "$DeviceProperties" | grep "^1" >/dev/null; echo $?` -eq 0 ]] && { echo More than 1 device found. Exiting.; exit 1; }
-  [[ `echo "$DeviceProperties" | grep "^0" >/dev/null; echo $?` -eq 0 ]] && { fPrintHostInfo; } || { echo No device found. Exiting.; exit 1; }
+  [[ `echo "$DeviceProperties" | grep "^0" >/dev/null; echo $?` -eq 0 ]] && { fPrintHostInfo; exit 0; } || { echo No device found. Exiting.; exit 1; }
 }
 fInputIsHostname() {
-  DeviceProperties=`sh -c "imsquery Hardware getAllObjects '{\"hostname\": {\"operation\": \"$DeviceName\"}}' $ImsQryLimit \"mask[id, hostname, domain, accountId, datacenter, networkVlans, networkManagementIpAddress, primaryBackendIpAddress, primaryIpAddress, softwareComponents[modifyDate, passwords[username, password], softwareLicense[softwareDescriptionId, softwareDescription[longDescription]]], uplinkNetworkComponents[id, name, port, primaryIpAddress, networkVlanId, macAddress, speed, status, uplink[id, uplinkComponent[id, hardwareId, name, port, duplexModeId, maxSpeed, speed, status, networkPortChannelId, networkVlanId]]], upstreamHardware[id, hostname]]\" | jqflatten -p"`
+  DeviceProperties=`sh -c "imsquery Hardware getAllObjects '{\"hostname\": {\"operation\": \"$DeviceName\"}}' $ImsQryLimit \"mask[id, hostname, domain, accountId, datacenter, networkVlans, networkManagementIpAddress, primaryBackendIpAddress, primaryIpAddress, softwareComponents[modifyDate, passwords[username, password], softwareLicense[softwareDescriptionId, softwareDescription[longDescription]]], uplinkNetworkComponents[id, name, port, primaryIpAddress, networkVlanId, macAddress, speed, status, uplink[id, uplinkComponent[id, hardwareId, name, port, duplexModeId, maxSpeed, speed, status, networkPortChannelId, networkVlanId]]], upstreamHardware[id, hostname]]\" 2> /dev/null | jqflatten -p"`
   [[ `echo "$DeviceProperties" | grep "^0" >/dev/null; echo $?` -ne 0 ]] && { echo No device found. Exiting.; exit 1; }
   [[ `echo "$DeviceProperties" | grep "^1" >/dev/null; echo $?` -ne 0 ]] && { fPrintHostInfo; exit 0; }
   TotalNumOfDevices=`echo "$DeviceProperties" | tail -1 | awk -F'.' '{print $1}'`
-  echo -e "\n\e[1mNUM    Device Domain                        HW_ID Loc  Acc_ID  Company\e[1;0m"
+  echo -e "\n\e[1mNUM     Device Domain                        HW_ID Loc  Acc_ID  Company\e[1;0m"
   for index in `seq 0 $TotalNumOfDevices`; do
     accountId=`fGetObject $index.accountId DeviceProperties`
-    AccountProperties=`sh -c "imsquery Account getAllObjects '{\"id\": {\"operation\": \"$accountId\"}}' $ImsQryLimit | jqflatten -p 2> /dev/null"`
-    printf "%3s" "$index"
+    AccountProperties=`sh -c "imsquery Account getAllObjects '{\"id\": {\"operation\": \"$accountId\"}}' $ImsQryLimit 2> /dev/null | jqflatten -p 2> /dev/null"`
+    printf "%3s " "$index"
     # printf "%10s" "`fGetObject $index.uplinkNetworkComponents.0.status DeviceProperties`"
     printf "%10s " "$DeviceName"
     printf "%-26s" "`fGetObject $index.domain DeviceProperties`"
@@ -134,16 +135,17 @@ fListAccountVirtGuest() {
   done
 }
 fAccountContent() {
-  AccountProperties=`sh -c "imsquery Account getAllObjects '{\"id\": {\"operation\": \"$accountId\"}}' $ImsQryLimit | jqflatten -p 2> /dev/null"`
+  AccountProperties=`sh -c "imsquery Account getAllObjects '{\"id\": {\"operation\": \"$accountId\"}}' $ImsQryLimit 2> /dev/null | jqflatten -p 2> /dev/null"`
   fPrintAccountInfo
-  AccountHardwareList=`sh -c "imsquery Hardware getAllObjects '{\"accountId\": {\"operation\": \"$accountId\"}}' $ImsQryLimit \"mask[id, hostname, domain, accountId, datacenter, networkVlans, networkManagementIpAddress, primaryBackendIpAddress, primaryIpAddress, softwareComponents[modifyDate, passwords[username, password], softwareLicense[softwareDescriptionId, softwareDescription[longDescription]]], uplinkNetworkComponents[id, name, port, primaryIpAddress, networkVlanId, macAddress, speed, status, uplink[id, uplinkComponent[id, hardwareId, name, port, duplexModeId, maxSpeed, speed, status, networkPortChannelId, networkVlanId]]], upstreamHardware[id, hostname]]\" | jqflatten -p"`
+  AccountHardwareList=`sh -c "imsquery Hardware getAllObjects '{\"accountId\": {\"operation\": \"$accountId\"}}' $ImsQryLimit \"mask[id, hostname, domain, accountId, datacenter, networkVlans, networkManagementIpAddress, primaryBackendIpAddress, primaryIpAddress, softwareComponents[modifyDate, passwords[username, password], softwareLicense[softwareDescriptionId, softwareDescription[longDescription]]], uplinkNetworkComponents[id, name, port, primaryIpAddress, networkVlanId, macAddress, speed, status, uplink[id, uplinkComponent[id, hardwareId, name, port, duplexModeId, maxSpeed, speed, status, networkPortChannelId, networkVlanId]]], upstreamHardware[id, hostname]]\" 2> /dev/null | jqflatten -p"`
   [[ `echo "$AccountHardwareList" | grep "^0" >/dev/null; echo $?` -eq 0 ]] && fListAccountHardware
-  AccountVirtGuestList=`sh -c "imsquery Virtual_Guest getAllObjects '{\"accountId\": {\"operation\": \"$accountId\"}}' $ImsQryLimit \"mask[id, hostname, domain, accountId, datacenter, networkVlans, primaryBackendIpAddress, primaryIpAddress, softwareComponents[modifyDate, passwords[username, password], softwareLicense[softwareDescriptionId, softwareDescription[longDescription]]]]\" | jqflatten -p"`
+  AccountVirtGuestList=`sh -c "imsquery Virtual_Guest getAllObjects '{\"accountId\": {\"operation\": \"$accountId\"}}' $ImsQryLimit \"mask[id, hostname, domain, accountId, datacenter, networkVlans, primaryBackendIpAddress, primaryIpAddress, softwareComponents[modifyDate, passwords[username, password], softwareLicense[softwareDescriptionId, softwareDescription[longDescription]]]]\" 2> /dev/null | jqflatten -p"`
   [[ `echo "$AccountVirtGuestList" | grep "^0" >/dev/null; echo $?` -eq 0 ]] && fListAccountVirtGuest
 }
 
 [[ $# -lt 1 ]] && { fPrintHelp; exit 10; }
 
+UsersName=`whoami`
 bSamplingPeriod=20
 
 InputParams=""
@@ -151,6 +153,8 @@ while [ $# -gt 0 ]; do
   case "$1" in
     -a)              shift;accountId=$1;shift;;
     -t)              shift;bSamplingPeriod=$1;[[ $bSamplingPeriod -lt 10 ]] && bSamplingPeriod=10;shift;;
+    -u)              shift;UsersName=$1;shift;;
+    -p)              shift;UsersPass=$1;shift;;
     --l2)            shift;bCheckL2Path=1;;
     --report)        bWriteOutputToFile="1";shift;;
     --no-report)     bWriteOutputToFile="";shift;;
@@ -161,6 +165,8 @@ done
 InputParams=`echo "$InputParams" | awk '{$1=$1};1'`
 
 fInitParams
+
+[[ ! -f ~/.data/input && ( -z $UsersName || -z $UsersPass ) && ! -z $bCheckL2Path ]] && { read -s -p "Softlayer Password: " UsersPass; echo ""; }
 
 [[ ! -z $accountId ]] && { fAccountContent; exit 0;}
 

@@ -4,7 +4,7 @@
 fInitParams() {
   ToolDir=/home/oarican/tools/nodedb
   NodeDbDir=$ToolDir/db
-  # NodeDbDir=/dev/shm/db
+  [[ ! -d $NodeDbDir ]] && NodeDbDir=/var/tools/nodedb/db
   BackupsMineDir=$ToolDir/backups.mine
   DCList=`ls $NodeDbDir`
   NonCsList=`echo -e "fas\nbas\nfcr\nbcr\ndar\nmbr\nppr\nbbr\ncbs\nxcr\nxcs\nslr\nrr\nbrr\nirr\nerr\nnpr\nnps\nfpr\nmsr\nmss\nir\nlbr\nlbs\nzer"`
@@ -18,7 +18,7 @@ fPrintHelp() {
   echo Usage:
   echo "nodedb <node_name> [-i [<interface>]]"
   echo "nodedb <dc_name> <pattern>"
-  echo "nodedb all <pattern>"
+  echo "nodedb all <pattern>"  
   echo "nodedb <IP>"
   echo "nodedb { { --populate-confs } | { [--build-db-nodetype] [--build-db-nodeintf] } }"
 }

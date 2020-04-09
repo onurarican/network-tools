@@ -54,7 +54,7 @@ if [[ -z $HostInfo ]]; then
   HostInfo=`nodedb $NodeDbHost`
 fi
 HostModel=`echo "$HostInfo" | awk -F'|' '{print $3}'`
-
+echo hop 1
 CmdIndex=0
 if [[ $bLongMode -ne 1 && ! -z $HostModel && `echo "$ListOfOld" | awk -v HostModel="$HostModel" '$1==HostModel' | wc -l` -eq 0 ]]; then
   sshpass $cmdparameter $passwd $SSHCOMMAND << EOF_run_commands

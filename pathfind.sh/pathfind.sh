@@ -3,14 +3,21 @@
 
 # Pre-requisites:
 # imsquery
+# jq
 # jqflatten
 # bc
 # interfacecounters
 
+# Next:
+# Move DB to /var
+# VLAN info
+# VLAN routed info
+# VRF info
+
 fInitParams() {
   MyName=`basename "$0"`
   ToolDir=/home/oarican/tools/pathfind
-  LogDir=$ToolDir/logs; [[ ! -d $LogDir ]] && mkdir -p $LogDir
+  LogDir=$ToolDir/logs; [[ -d $ToolDir && ! -d $LogDir ]] && mkdir -p $LogDir
   LogFile=$LogDir/pathfind.log
   MonitorStartTime=`date '+%Y%m%d-%H%M%S'`
   MemTempFile=/dev/shm/TempFileForScript-$MonitorStartTime; cat /dev/null > $MemTempFile
@@ -59,13 +66,18 @@ fListConnections() {
     LocalName=$3
     LocalBrand=$4
     LocalModel=$5
-    LocalInterfaceType=`fGetObject 0.uplinkNetworkComponents.$index.name $1 | sed 's/Uplink TenGigabitEthernet/ten/' | sed 's/Uplink GigabitEthernet/gig/' | sed 's/Uplink Ethernet/eth/'`
+    if [[ $LocalBrand == "server" ]]; then
+      LocalInterfaceType=`fGetObject 0.uplinkNetworkComponents.$index.name $1 | sed 's/Uplink TenGigabitEthernet/ten/' | sed 's/Uplink GigabitEthernet/gig/' | sed 's/Uplink Ethernet/eth/'`
+    else
+      LocalInterfaceType=`fGetObject 0.uplinkNetworkComponents.$index.name $1 | sed '/[a-zA-Z]$/ ! s/$/\//' | sed 's/Uplink TenGigabitEthernet/ten/' | sed 's/Uplink GigabitEthernet/gig/' | sed 's/Uplink Ethernet/eth/'`
+    fi
     LocalInterfacePort=`fGetObject 0.uplinkNetworkComponents.$index.port $1`
     if [[ $LocalBrand == "server" ]]; then
       LocalInterfaceName=$LocalInterfaceType$LocalInterfacePort
     else
       LocalsAllInterfacesList=`nodedb $LocalName -i | awk -F'|' '{print $2}'| sort -n | uniq`
-      LocalInterfaceName=`echo "$LocalsAllInterfacesList" | grep "$LocalInterfaceType$LocalInterfacePort" | awk -F'|' '{print $2}' | head -1`
+      # [[ $DebugMode -eq 1 ]] && { echo "$LocalName - LocalsAllInterfacesList - $LocalInterfaceType$LocalInterfacePort" >> $LogFile; echo "$LocalsAllInterfacesList" >> $LogFile; }
+      LocalInterfaceName=`echo "$LocalsAllInterfacesList" | grep "$LocalInterfaceType$LocalInterfacePort" | head -1`
       if [[ -z $LocalInterfaceName ]]; then
         [[ $LocalBrand != "arista" ]] && LocalInterfaceName=$LocalInterfaceType$LocalInterfacePort || LocalInterfaceName=$LocalInterfaceType$LocalInterfacePort/1
       fi
@@ -76,19 +88,27 @@ fListConnections() {
     RemoteName=`fGetObject 0.upstreamHardware.$UpsHWIndex.hostname $1`
     # RemoteSysDescr=`zsnmpwalk $RemoteName --sysDescr`
     # for RemoteBrand in cisco arista juniper; do echo "$RemoteSysDescr" | grep -i $RemoteBrand > /dev/null; [[ $? -eq 0 ]] && break; done
-    RemoteBrand=`nodedb $RemoteName | awk -F'|' '{print $2}'`
+    RemotesNodedbOutput=`nodedb $RemoteName`
+    if [[ -z $RemotesNodedbOutput ]]; then
+      FirstWordAsIs=`echo "$RemoteName" | awk -F'.' '{print $1}'`
+      FirstWordWithoutAB=`echo "$FirstWordAsIs" | sed 's/a$//' | sed 's/b$//'`
+      RemoteName=`echo "$RemoteName" | sed "s/$FirstWordAsIs/$FirstWordWithoutAB/"`
+      RemoteBrand=`nodedb $RemoteName | awk -F'|' '{print $2}'`
+    else
+      RemoteBrand=`echo $RemotesNodedbOutput | awk -F'|' '{print $2}'`
+    fi
     # RemoteModel
     RemoteInterfaceType=`fGetObject 0.uplinkNetworkComponents.$index.uplink.uplinkComponent.name $1 | sed '/[a-zA-Z]$/ ! s/$/\//' | sed 's/TenGigabitEthernet/ten/' | sed 's/GigabitEthernet/gig/' | sed 's/Ethernet/eth/'`
     RemoteInterfacePort=`fGetObject 0.uplinkNetworkComponents.$index.uplink.uplinkComponent.port $1`
-    RemotesAllInterfacesList=`nodedb $RemoteName --list-interfaces | sed 's/TenGigabitEthernet/ten/' | sed 's/GigabitEthernet/gig/' | sed 's/Ethernet/eth/'`
-    RemoteInterfaceName=`echo "$RemotesAllInterfacesList" | grep "$RemoteInterfaceType$RemoteInterfacePort" | awk -F'|' '{print $2}' | head -1`
+    RemotesAllInterfacesList=`nodedb $RemoteName -i | awk -F'|' '{print $2}'| sort -n | uniq`
+    # [[ $DebugMode -eq 1 ]] && { echo "$LocalName - RemotesAllInterfacesList - $RemoteInterfaceType$RemoteInterfacePort" >> $LogFile; echo "$RemotesAllInterfacesList" >> $LogFile; }
+    RemoteInterfaceName=`echo "$RemotesAllInterfacesList" | grep "$RemoteInterfaceType$RemoteInterfacePort" | head -1`
     if [[ -z $RemoteInterfaceName ]]; then
       [[ $RemoteBrand != "arista" || $LocalBrand == "server" ]] && RemoteInterfaceName=$RemoteInterfaceType$RemoteInterfacePort || RemoteInterfaceName=$RemoteInterfaceType$RemoteInterfacePort/1
     fi
-    # Deneme
+    # LocalsAllInterfacesList and RemotesAllInterfacesList checks are to verify if Node is found in nodedb
     if [[ $LocalBrand != "server" ]]; then
-      HostsFilesNodeName=`echo "$HostsFileVar" | awk -v LocalName="$LocalName" '$2==LocalName {print $2}' | head -1`
-      if [[ -z $HostsFilesNodeName ]]; then
+      if [[ -z $LocalsAllInterfacesList ]]; then
         [[ $DebugMode -eq 1 ]] && echo $MonitorStartTime - fListConnections:  LocalName : $LocalName icin girdik >> $LogFile
         FirstWordAsIs=`echo "$LocalName" | awk -F'.' '{print $1}'`
         FirstWordWithoutA=`echo "$FirstWordAsIs" | sed 's/a$//'`
@@ -97,8 +117,7 @@ fListConnections() {
         [[ $DebugMode -eq 1 ]] && echo $MonitorStartTime - fListConnections:  LocalName : $LocalName olarak cikti >> $LogFile
       fi
     fi
-    HostsFilesNodeName=`echo "$HostsFileVar" | awk -v RemoteName="$RemoteName" '$2==RemoteName {print $2}' | head -1`
-    if [[ -z $HostsFilesNodeName ]]; then
+    if [[ -z $RemotesAllInterfacesList ]]; then
       [[ $DebugMode -eq 1 ]] && echo $MonitorStartTime - fListConnections:  RemoteName : $RemoteName icin girdik >> $LogFile
       FirstWordAsIs=`echo "$RemoteName" | awk -F'.' '{print $1}'`
       FirstWordWithoutA=`echo "$FirstWordAsIs" | sed 's/a$//'`
@@ -115,12 +134,13 @@ while read -r PreviousLevelNode; do
   NodeName=`echo "$PreviousLevelNode" | awk '{print $1}'`
   NodeHWID=`echo "$PreviousLevelNode" | awk '{print $2}'`
   NodeBrand=`echo "$PreviousLevelNode" | awk '{print $3}'`
-  NodeProperties=`sh -c "imsquery Hardware getAllObjects '{\"id\": {\"operation\": $NodeHWID}}' $ImsQryLimit \"mask[id, hostname, domain, accountId, datacenter, networkVlans, networkManagementIpAddress, primaryBackendIpAddress, primaryIpAddress, softwareComponents[modifyDate, passwords[username, password], softwareLicense[softwareDescriptionId, softwareDescription[longDescription]]], uplinkNetworkComponents[id, name, port, primaryIpAddress, networkVlanId, macAddress, speed, status, uplink[id, uplinkComponent[id, hardwareId, name, port, duplexModeId, maxSpeed, speed, status, networkPortChannelId, networkVlanId]]], upstreamHardware[id, hostname]]\" | jqflatten -p"`
+  NodeModel=`nodedb $NodeName | awk -F'|' '{print $3}'`
+  NodeProperties=`sh -c "imsquery Hardware getAllObjects '{\"id\": {\"operation\": $NodeHWID}}' $ImsQryLimit \"mask[id, hostname, domain, accountId, datacenter, networkVlans, networkManagementIpAddress, primaryBackendIpAddress, primaryIpAddress, softwareComponents[modifyDate, passwords[username, password], softwareLicense[softwareDescriptionId, softwareDescription[longDescription]]], uplinkNetworkComponents[id, name, port, primaryIpAddress, networkVlanId, macAddress, speed, status, uplink[id, uplinkComponent[id, hardwareId, name, port, duplexModeId, maxSpeed, speed, status, networkPortChannelId, networkVlanId]]], upstreamHardware[id, hostname]]\" 2> /dev/null | jqflatten -p"`
   [[ `echo "$NodeProperties" | grep "^1" >/dev/null; echo $?` -eq 0 ]] && { echo More than 1 device found. Exiting.; exit 1; }
 
   indices=`fListObjects NodeProperties 0 uplinkNetworkComponents | awk -F'.' '{print $3}' | sort | uniq`
   
-  fListConnections NodeProperties indices $NodeName $NodeBrand model
+  fListConnections NodeProperties indices $NodeName $NodeBrand $NodeModel
 done < <(echo "${!1}" | awk '{print $4 " " $5 " " $6}' | sort | uniq)
 }
 fListInterfaceCountersCommands() {
@@ -147,18 +167,13 @@ fListInterfaceCountersCommands() {
 }
 fCalculateCounterDifferences() {
   InterfaceCountersCommand=$@
-  Node=`echo "$InterfaceCountersCommand" | awk '{print $3}'`
-  # # Deneme
-  # HostsFilesNodeName=`echo "$HostsFileVar" | awk -v Node="$Node" '$2==Node'`
-  # if [[ -z $HostsFilesNodeName ]]; then
-  #   FirstWordWithoutA=`echo "$Node" | awk -F'.' '{print $1}'`
-  #   InterfaceCountersCommand=`echo "$InterfaceCountersCommand" | sed 's/"$FirstWordWithoutA"a\./"$FirstWordWithoutA"\./'`
-  # fi
+  [[ ! -z $UsersName && ! -z $UsersPass ]] && Node=`echo "$InterfaceCountersCommand" | awk '{print $7}'` || Node=`echo "$InterfaceCountersCommand" | awk '{print $3}'`
   Brand=`echo "$NodeAndBrandList" | awk -v Node="$Node" '$1==Node {print $2}' | head -1`
+
   starttime=`date '+%s.%N' | cut -c 1-14`
   case "$Brand" in
     arista)  CountersStart=`$InterfaceCountersCommand | grep -v packets | grep -v cast`;;
-    cisco)   CountersStart=`$InterfaceCountersCommand | grep -v t_packets | grep -v o_packet | grep -v packets_i | grep -v packets_o | grep -v broadcasts | grep -v multicasts`;;
+    cisco)   CountersStart=`$InterfaceCountersCommand | grep -v t_packets | grep -v o_packet | grep -v packets_i | grep -v packets_o | grep -v broadcast | grep -v multicast`;;
     juniper) CountersStart=`$InterfaceCountersCommand`;;
     *)       echo cikiyoruz; break;;
   esac  
@@ -167,7 +182,7 @@ fCalculateCounterDifferences() {
   [[ ${TimeToWait:0:1} != "-" ]] && sleep $TimeToWait
   case "$Brand" in
     arista)  CountersFinish=`$InterfaceCountersCommand | grep -v packets | grep -v cast`;;
-    cisco)   CountersFinish=`$InterfaceCountersCommand | grep -v t_packets | grep -v o_packet | grep -v packets_i | grep -v packets_o | grep -v broadcasts | grep -v multicasts`;;
+    cisco)   CountersFinish=`$InterfaceCountersCommand | grep -v t_packets | grep -v o_packet | grep -v packets_i | grep -v packets_o | grep -v broadcast | grep -v multicast`;;
     juniper) CountersFinish=`$InterfaceCountersCommand`;;
     *)       echo cikiyoruz; break;;
   esac
@@ -190,8 +205,9 @@ fGetNodesInterfaceErrors() {
   IncedCntrList=`echo "$CounterDiffs" | grep -v bytes | awk -v Node="$Node" -v Interface="$Interface" '$1==Node && $2==Interface && ($4!="0" || $5!="0") {print $3 ":" $4 "+" $5}'`
   [[ $bBps != "--bps" ]] && echo "$IncedCntrList" | grep -v bytes | awk 'BEGIN {ORS=" "} {print}' | awk '{$1=$1};1' || echo "$IncedCntrList" | awk 'BEGIN {ORS=" "} {print}' | awk '{$1=$1};1'
   UnchangedCntrNum=`echo "$CounterDiffs" | grep -v bytes | awk -v Node="$Node" -v Interface="$Interface" '$1==Node && $2==Interface && $5=="0" {print $3 ":" $5}' | wc -l`
+  AllZeroCntrNum=`echo "$CounterDiffs" | grep -v bytes | awk -v Node="$Node" -v Interface="$Interface" '$1==Node && $2==Interface && $4=="0" && $5=="0" {print $3 ":" $5}' | wc -l`
   ChangedCntrNum=`echo "$CounterDiffs" | grep -v bytes | awk -v Node="$Node" -v Interface="$Interface" '$1==Node && $2==Interface && $5!="0" {print $3 ":" $5}' | wc -l`
-  return $(( 40 * $ChangedCntrNum + $UnchangedCntrNum ))
+  return $(( 40 * $ChangedCntrNum + $AllZeroCntrNum ))
 }
 fPrintHostInfo() {
   echo -e "\n\e[93mDEVICE INFORMATION\e[1;0m"
@@ -202,7 +218,7 @@ fPrintHostInfo() {
   printf "%-16s %s\n" "OS Description: " "`fGetObject 0.softwareComponents.0.softwareLicense.softwareDescription.longDescription DeviceProperties`"
   printf "%-16s %s\n" "OS Username: " "`fGetObject 0.softwareComponents.0.passwords.0.username DeviceProperties`"
   printf "%-16s %s\n" "OS Password: " "`fGetObject 0.softwareComponents.0.passwords.0.password DeviceProperties`"
-  printf "%-16s %s\n" "Management IP: " "`fGetObject 0.networkManagementIpAddress DeviceProperties`"
+  printf "%-16s %s / %s    "$ClGray"(%s)"$ClNormal"\n" "Device IPs: " "`fGetObject 0.primaryBackendIpAddress DeviceProperties`" "`fGetObject 0.primaryIpAddress DeviceProperties`" "`fGetObject 0.networkManagementIpAddress DeviceProperties`"
 }
 
 UsersName=`whoami`
@@ -232,22 +248,36 @@ fInitParams
 [[ `echo "$InputParams" | wc -w` -ne 1 ]] && { fPrintHelp; exit 1; }
 DeviceHWID=`echo "$InputParams" | awk '{print $1}'`
 
-DeviceProperties=`sh -c "imsquery Hardware getAllObjects '{\"id\": {\"operation\": $DeviceHWID}}' $ImsQryLimit \"mask[id, hostname, domain, accountId, datacenter, networkVlans, networkManagementIpAddress, primaryBackendIpAddress, primaryIpAddress, softwareComponents[modifyDate, passwords[username, password], softwareLicense[softwareDescriptionId, softwareDescription[longDescription]]], uplinkNetworkComponents[id, name, port, primaryIpAddress, networkVlanId, macAddress, speed, status, uplink[id, uplinkComponent[id, hardwareId, name, port, duplexModeId, maxSpeed, speed, status, networkPortChannelId, networkVlanId]]], upstreamHardware[id, hostname]]\" | jqflatten -p"`
+DeviceProperties=`sh -c "imsquery Hardware getAllObjects '{\"id\": {\"operation\": $DeviceHWID}}' $ImsQryLimit \"mask[id, hostname, domain, accountId, datacenter, networkVlans, networkManagementIpAddress, primaryBackendIpAddress, primaryIpAddress, softwareComponents[modifyDate, passwords[username, password], softwareLicense[softwareDescriptionId, softwareDescription[longDescription]]], uplinkNetworkComponents[id, name, port, primaryIpAddress, networkVlanId, macAddress, speed, status, uplink[id, uplinkComponent[id, hardwareId, name, port, duplexModeId, maxSpeed, speed, status, networkPortChannelId, networkVlanId]]], upstreamHardware[id, hostname]]\" 2> /dev/null | jqflatten -p"`
 
 [[ `echo "$DeviceProperties" | grep "^1" >/dev/null; echo $?` -eq 0 ]] && { echo More than 1 device found. Exiting.; exit 1; }
 
 [[ $bPrintHost -eq 1 ]] && fPrintHostInfo
 
+# Status update notification for user
+echo -ne "Building connections & Collecting first samples...\r"
+
 ListOfuplinkNetworkComponents=`fListObjects DeviceProperties 0 uplinkNetworkComponents`
+[[ $DebugMode -eq 1 ]] && echo "$ListOfuplinkNetworkComponents" > $LogDir/ListOfuplinkNetworkComponents.dat
 
 DeviceName=`fGetObject 0.hostname DeviceProperties`
 CountersOutputFile=$DeviceName-$MonitorStartTime-Counters.txt
 
 indices=`fListObjects DeviceProperties 0 uplinkNetworkComponents | awk -F'.' '{print $3}' | sort | uniq`
+[[ $DebugMode -eq 1 ]] && echo "$indices" > $LogDir/indices.dat
 
+# Status update notification for user
+echo -ne "Building switching level-1 connections...               \r"
 Level1Conns=`fListConnections DeviceProperties indices $DeviceName server linux`
+[[ $DebugMode -eq 1 ]] && { echo "Level1Conns" >> $LogFile; echo "$Level1Conns" >> $LogFile; }
+# Status update notification for user
+echo -ne "Building switching level-2 connections...               \r"
 Level2Conns=`fListNextLevelConnections Level1Conns`
+[[ $DebugMode -eq 1 ]] && { echo "Level2Conns" >> $LogFile; echo "$Level2Conns" >> $LogFile; }
+# Status update notification for user
+echo -ne "Building switching level-3 connections & Collecting first samples...\r"
 Level3Conns=`fListNextLevelConnections Level2Conns`
+[[ $DebugMode -eq 1 ]] && { echo "Level3Conns" >> $LogFile; echo "$Level3Conns" >> $LogFile; }
 
 Lev1Backends=`echo "$Level1Conns" | awk '$4 ~ /^ *b/' | sort -nk4 | awk '{print $1 " " $2 " " $3 " " $4}'`
 Lev2Backends=`echo "$Level2Conns" | awk '$1 ~ /^ *b/' | sort -n | awk '{print $1 " " $2 " " $3 " " $4}'`
@@ -266,12 +296,23 @@ while read -r ThisInterfaceCountersCommand; do
   pids[${CommandCounter}]=$!
 done < <(echo "$ListOfInterfaceCountersCommands")
 
+# Status update notification for user
+# Countdown notifier
+for index in $(eval echo {$SamplingPeriod..1}); do
+ [[ $index -gt 9 ]] && echo -ne "Waiting before collecting second samples $index                           \r" || echo -ne "Waiting before collecting second samples 0$index                           \r"
+ sleep 1
+done
+echo -ne "Collecting second samples...                   \r"
+
 # wait for all pids
 for pid in ${pids[*]}; do
   wait $pid
 done
 
 CounterDiffs=`cat $MemTempFile`; rm -f $MemTempFile
+
+# Clear status update notification for user
+echo -ne "                                                         \r"
 
 # Print Backends then Frontends
 for nwsection in Lev1Backends Lev2Backends Lev3Backends Lev1Frontends Lev2Frontends Lev3Frontends; do
@@ -315,7 +356,7 @@ for nwsection in Lev1Backends Lev2Backends Lev3Backends Lev1Frontends Lev2Fronte
         printf ""$ClRed"\x21"$ClNormal""
       fi
     fi
-    printf "--"
+    echo -n "--"
     if [[ -z $RightErrors ]]; then
       if [[ $RightSuccessNum -ne 0 ]]; then
         printf ""$ClGreen"\xE2\x9C\x94"$ClNormal""
