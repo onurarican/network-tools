@@ -1,0 +1,99 @@
+grep -i "crc" -hr ams01 | sort -rnk6 -t'|' | head -25
+
+
+# CRC errors, minimum 3 error/sec, sort by rate
+min=10800
+time grep -i "crc" -hr ./* | awk -F'|' -v min="$min" '$8>=min && $8!="na"' | sort -rnk8 -t'|' | wc -l
+
+# + time_diff is not 1 hour
+min=10800
+time grep -i "crc" -hr ./* | awk -F'|' -v min="$min" '$8>=min && $8!="na" && $5!="1"' | sort -rnk8 -t'|' | wc -l
+
+# min is in increments/day
+min=1000000
+dc=dal09
+time grep -i "crc" -hr ./* | grep $dc | awk -F'|' -v min="$min" '$8>=min/24 && $8!="na"' | sort -rnk8 -t'|' | wc -l
+
+
+utilityams0301 ++ sto01
+utilitywdc0601 ++ atl01 pal01
+utilitywdc0701 ++ mia01 nyc01
+utilitytok0401 ++ osa01
+utilitytok0501 ++ osk01
+utilitysyd0401 ++ per01
+
+
+
+utilityche0101 OK che01
+utilityhkg0201 OK hkg01 hkg02 hkg03
+utilityhou0201 OK hou00 hou02
+utilitymel0101 OK mel01 mel02 mel03
+utilitymex0101 OK mex01
+utilitymil0101 OK mil01 mil02
+utilitymon0101 OK mon01 mon02
+utilityosl0101 OK osl01 osl02
+utilitypar0101 OK par01 par02
+utilitysao0101 OK sao01 sao02
+utilitysea0101 OK sea01 sea02
+utilityseo0101 OK seo01 seo02
+utilitysjc0101 OK sjc01 sjc02
+utilitysjc0301 OK sjc03 sjc04
+utilitysjc0401 OK chi01 den01 lax01
+utilitysng0101 OK sng01 sng02
+utilitytor0101 OK tor01 tor02
+
+
+sudo crontab -u oarican -e
+
+utilitymasterdal1001
+0 */4 * * *             PATH=/home/oarican/.local/bin:/home/oarican/bin:/usr/local/bin:/usr/bin:/usr/local/sbin:/usr/sbin; dataprocessor.sh > /dev/null 2>&1
+
+che - 10.5
+32 16 * * *             PATH=/home/oarican/.local/bin:/home/oarican/bin:/usr/local/bin:/usr/bin:/usr/local/sbin:/usr/sbin; zSiteMonitoringAgent > /dev/null 2>&1
+
+hkg -13
+02 14 * * *             PATH=/home/oarican/.local/bin:/home/oarican/bin:/usr/local/bin:/usr/bin:/usr/local/sbin:/usr/sbin; zSiteMonitoringAgent > /dev/null 2>&1
+
+hou 0
+02 03 * * *             PATH=/home/oarican/.local/bin:/home/oarican/bin:/usr/local/bin:/usr/bin:/usr/local/sbin:/usr/sbin; zSiteMonitoringAgent > /dev/null 2>&1
+
+mel +8
+02 11 * * *             PATH=/home/oarican/.local/bin:/home/oarican/bin:/usr/local/bin:/usr/bin:/usr/local/sbin:/usr/sbin; zSiteMonitoringAgent > /dev/null 2>&1
+
+mex +1
+02 04 * * *             PATH=/home/oarican/.local/bin:/home/oarican/bin:/usr/local/bin:/usr/bin:/usr/local/sbin:/usr/sbin; zSiteMonitoringAgent > /dev/null 2>&1
+
+mil -7
+02 20 * * *             PATH=/home/oarican/.local/bin:/home/oarican/bin:/usr/local/bin:/usr/bin:/usr/local/sbin:/usr/sbin; zSiteMonitoringAgent > /dev/null 2>&1
+
+mon
+02 02 * * *             PATH=/home/oarican/.local/bin:/home/oarican/bin:/usr/local/bin:/usr/bin:/usr/local/sbin:/usr/sbin; zSiteMonitoringAgent > /dev/null 2>&1
+
+osl
+02 20 * * *             PATH=/home/oarican/.local/bin:/home/oarican/bin:/usr/local/bin:/usr/bin:/usr/local/sbin:/usr/sbin; zSiteMonitoringAgent > /dev/null 2>&1
+
+par
+02 20 * * *             PATH=/home/oarican/.local/bin:/home/oarican/bin:/usr/local/bin:/usr/bin:/usr/local/sbin:/usr/sbin; zSiteMonitoringAgent > /dev/null 2>&1
+
+sao
+02 01 * * *             PATH=/home/oarican/.local/bin:/home/oarican/bin:/usr/local/bin:/usr/bin:/usr/local/sbin:/usr/sbin; zSiteMonitoringAgent > /dev/null 2>&1
+
+sea
+02 05 * * *             PATH=/home/oarican/.local/bin:/home/oarican/bin:/usr/local/bin:/usr/bin:/usr/local/sbin:/usr/sbin; zSiteMonitoringAgent > /dev/null 2>&1
+
+seo +10
+02 13 * * *             PATH=/home/oarican/.local/bin:/home/oarican/bin:/usr/local/bin:/usr/bin:/usr/local/sbin:/usr/sbin; zSiteMonitoringAgent > /dev/null 2>&1
+
+sjc
+02 05 * * *             PATH=/home/oarican/.local/bin:/home/oarican/bin:/usr/local/bin:/usr/bin:/usr/local/sbin:/usr/sbin; zSiteMonitoringAgent > /dev/null 2>&1
+
+den
+02 04 * * *             PATH=/home/oarican/.local/bin:/home/oarican/bin:/usr/local/bin:/usr/bin:/usr/local/sbin:/usr/sbin; zSiteMonitoringAgent > /dev/null 2>&1
+
+sng
+02 14 * * *             PATH=/home/oarican/.local/bin:/home/oarican/bin:/usr/local/bin:/usr/bin:/usr/local/sbin:/usr/sbin; zSiteMonitoringAgent > /dev/null 2>&1
+
+tor
+02 02 * * *             PATH=/home/oarican/.local/bin:/home/oarican/bin:/usr/local/bin:/usr/bin:/usr/local/sbin:/usr/sbin; zSiteMonitoringAgent > /dev/null 2>&1
+
+

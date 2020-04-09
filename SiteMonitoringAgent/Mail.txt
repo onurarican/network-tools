@@ -1,0 +1,51 @@
+I developed a tool, which is monitoring error counters on almost all network device interfaces in IBM Cloud network, periodically and in continuous manner. This can help us to be proactive on detecting faults, to take corrective actions. The tool is distributed over 43 utility servers in regions, sharing the work load. A graphical presentation of the produced data is on https://utilitymasterdal1001.softlayer.local/reports/counters/index.html web interface. This web interface is just to display statistics in a simple view, more features can be added, but the important part is the data being collected and produced, being continuously updated on the background. Please see an example view from the web interface as follows, showing 3 device interfaces, having very high rate (>10 million/day) of CRC error increments in dal13 at the moment.
+
+   bcs41a.sr01.dal13   eth49/1
+   fcs12b.sr01.dal13   eth49/1
+   fcs51b.sr01.dal13   eth50/1
+
+Gorsel
+
+My thoughts
+
+I believe this tool and its produced data can highly affect the efficiency of our operations in IBM Cloud network, by alerting NRE, us, and probably some other network teams, letting us to take proactive actions. You know, customers are reporting packet loss problems, and after our investigation CRC counter increments are found on network for some of these incidents. These CRC counter increments are usually found on aggregation layer of switching network, affecting multiple customers, and we are reporting to NRE. I have reported 3 of these issues (originally reported as packet loss by customer ticket) to NRE in the last 10 days, probably many others are being reported by our team mates too, over time. The one I reported last Friday, bcs42a.sr01.dal13's interface eth50/1, its record was already there on CRC-dal13 page on this new tool, it was on the top that day. Actually NRE's action was timely, they have quickly taken the link out of production. However, as IBM Cloud, we can be more proactive, and resolve some of the interface problems before they are affecting customer's network experience. NRE already has tools to monitor network, producing alerts, but as I know existing tools are not monitoring in this detail with these counters, so they may benefit from this tool too.
+
+Possible Use Cases
+CRC Counter
+The interfaces, falling under top two categories (greater than 10M/day and 1M/day increment rates), could be taken care of (cleaned, reseated, replaced etc), before causing problems on customer network experience. Currently 9 interfaces on our network are in "greater than 10M/day" CRC error increments category, 48 interfaces in "greater than 1M/day" category.
+
+PAUSE Frames
+As I see from the tool these counters are mostly being incremented on customer facing BCS and FCS interfaces. Since PAUSE frames indicate possible problem on remote end, maybe we can push notifications to customer portal, for the customers that own these devices (such as ESXi servers, or rarely Customer Edge Routers behind direct-link, other servers, VSIs etc). This way customer can have more awareness of resource starvation on their end, review their recent actions, such as if they have recently launched a new VM on ESXi they can understand that it is already overloaded, and maybe they can move it to a new ESXi etc. Currently 342 interfaces on our network are receiving "greater than 10M/day" PAUSE frames.
+
+Giants and Runts Counters
+Similarly these counters are mostly being incremented on customer facing BCS and FCS interfaces. Notifications might be sent to the customers that own these devices, indicating their traffic has issues with MTU limits on our network. Similarly if they have changed something recently, deployed a new service etc, they can understand those may have issues, and they can correct by theirselves instead of reporting to us as a problem.
+
+Input Discards and Output Discards
+These two are the type of counters that are incrementing the most, when comparing with the other counter types.
+
+
+These scenarios are just my ideas, other counters can be analysed and appropriate actions could be taken, by relevant team, in a continuous manner.
+
+
+Brief summary of the tool's operation
+
+On Regional Utility Server:
+- The process on each utility server is being woken up by a crontab record at 3:02 am (real local time of the utility server's region), relatively less busy time for both utility server and the network devices in the region.
+- The process monitors almost all routers and switches on the datacenters that it is responsible of (e.g. utilitysyd0101 monitors syd01, syd02).
+Device Types being monitored: "bcs bas bcr fcs fas fcr mbr ppr dar bbr cbs xcr xcs"
+Device Interfaces being monitored: All physical interfaces
+Counters being monitored: All counters presented in device verification command outputs (Around 26 counters in Cisco devices, 14 in Arista, 24 in Juniper)
+- A record is created per {Device,Interface,Counter} triple, where counter value is non-zero. Every 24 hours these triples are re-checked and records are updated with new value. Value differences, error increment rates (in "/hr" and "/day") are calculated and kept in the same records.
+- Once above process is done, records are created and updated, Regional Utility Server sends the record files to Master Utility Server
+
+On Master Utility Server:
+- Records are flowing from regions frequently, almost every hour. Currently there are 1229545 records, these records are being updated dynamically. Master Utility Server processes this data every 4 hours, categorises based on "Counter Type" and "Data Center".
+- An HTML page is created for each "Counter Type". Each of these Counter Type HTML page presents graphs for each "Data Center". Each of these graphs displays number of interfaces that this Counter is incrementing and it categorises based on increment rates, to highlight more urgent ones, for the entire "Data Center" (including bbr, cbs, xcr, xcs etc devices). The categories are:
+1 to 100 errors per day
+100 to 1000 errors per day
+10^3 to 10^4 errors per day
+10^4 to 10^5 errors per day
+10^5 to 10^6 errors per day
+10^6 to 10^7 errors per day
+10^7 and above errors per day (means over 10 million error increments per day, the most urgent)
+- There is a link below each graph, pointed to a text file, listing these problematic interfaces, sorted by error increment rate.

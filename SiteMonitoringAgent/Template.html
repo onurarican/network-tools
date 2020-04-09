@@ -1,0 +1,33 @@
+<html>
+  <head>
+    <script type="text/javascript" src="https://www.google.com/jsapi?autoload={'modules':[{'name':'visualization','version':'1','packages':['corechart']}]}"></script>
+       <div id="chart_div" style="width: 500px; height: 250px;"></div>
+    <script type="text/javascript">
+      google.setOnLoadCallback(drawChart);
+      function drawChart() {
+
+        var data = google.visualization.arrayToDataTable([
+          ['Element', 'int', { role: 'style' }],
+          ['1 - 100', 1to100, '#80e030'],
+          ['100 - 1000', 100to1000, '#c0e030'],
+          ['10^3 - 10^4', 1000to10000, '#ffe000'],
+          ['10^4 - 10^5', 10000to100000, '#ffb030'],
+          ['10^5 - 10^6', 100000to1000000, '#ff8030'],
+          ['10^6 - 10^7', 1000000to10000000, '#ff5030'],
+          ['10^7-above', 10000000above, '#ff1030' ],
+        ]);
+
+        var options = {
+          title: 'thetitle',
+          series: { 1: {color: 'lightgray'} } // series: [ {}, {color: 'lightgray'} ]
+        };
+
+        var chart = new google.visualization.ColumnChart(document.getElementById('chart_div'));
+
+        chart.draw(data, options);
+
+      }
+    </script>
+  </head>
+  <a href="thetextfileref" target="_blank">thedc - thecounter - list</a>
+</html>

@@ -1,0 +1,35 @@
+<html>
+  <head>
+    <script type="text/javascript" src="https://www.google.com/jsapi?autoload={'modules':[{'name':'visualization','version':'1','packages':['corechart']}]}"></script>
+       <div id="chart_div" style="width: 500px; height: 250px;"></div>
+    <script type="text/javascript">
+      google.setOnLoadCallback(drawChart);
+      function drawChart() {
+
+        var data = google.visualization.arrayToDataTable([
+          ['Element', 'int', { role: 'style' }],
+          ['1 - 100', 54, '#80e030'],
+          ['100 - 1000', 58, '#c0e030'],
+          ['10^3 - 10^4', 38, '#ffe000'],
+          ['10^4 - 10^5', 22, '#ffb030'],
+          ['10^5 - 10^6', 5, '#ff8030'],
+          ['10^6 - 10^7', 7, '#ff5030'],
+          ['10^7-above', 3, '#ff1030' ],
+        ]);
+
+        var options = {
+          title: 'dal13 - CRC',
+          series: { 1: {color: 'lightgray'} } // series: [ {}, {color: 'lightgray'} ]
+        };
+
+        var chart = new google.visualization.ColumnChart(document.getElementById('chart_div'));
+
+        chart.draw(data, options);
+
+      }
+    </script>
+  </head>
+  <body>
+    <div id="columnchart_material" style="width: 500px; height: 250px;"></div>
+  </body>
+</html>
